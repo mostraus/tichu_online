@@ -7,9 +7,10 @@ class TichuPlayer:
         self.hand = []  # List of TichuCard objects
         self.tricks_won = []  # List of cards won in tricks
         self.called_tichu = False
-        self.called_grand_tichu = False
+        self.called_grand_tichu = None
         self.finished = False  # True if player is out of cards
         self.sid = sid
+        self.has_played = False
 
     def receive_card(self, card):
         self.hand.append(card)
@@ -40,8 +41,9 @@ class TichuPlayer:
         self.hand.clear()
         self.tricks_won.clear()
         self.called_tichu = False
-        self.called_grand_tichu = False
+        self.called_grand_tichu = None
         self.finished = False
+        self.has_played = False
 
     def __repr__(self):
         return f"{self.name} (Team {self.team})"

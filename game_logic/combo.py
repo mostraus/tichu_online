@@ -57,6 +57,11 @@ class Combo:
             else:
                 return "straight"
 
+        # === PAIR SEQUENCE (Treppenpärchen) ===
+        if len(cards) >= 4 and len(cards) % 2 == 0:
+            if self.is_pair_sequence(cards):
+                return "pair_sequence"
+
         return "invalid"
 
     def is_straight(self, cards):
@@ -84,6 +89,42 @@ class Combo:
                     return True
 
         return False
+
+    def is_pair_sequence(self, cards):
+        phoenix_count = sum(1 for c in cards if c.name.lower() == "phoenix")
+        non_phoenix_cards = [c for c in cards if c.name.lower() != "phoenix"]
+
+        # Sortiere Nicht-Phoenix-Karten nach Rank
+        sorted_cards = sorted(non_phoenix_cards, key=lambda c: c.rank)
+
+        # Prüfen, ob jede zweite Karte ein Pärchen ist (ohne Phoenix)
+        pair_ranks = []
+        used_phoenix = 0
+        i = 0
+        while i < len(sorted_cards):
+            if i + 1 < len(sorted_cards) and sorted_cards[i].rank == sorted_cards[i + 1].rank:
+                # Normales Paar gefunden
+                pair_ranks.append(sorted_cards[i].rank)
+                i += 2
+            else:
+                # Fehlendes Paar -> Phoenix einsetzen, falls verfügbar
+                if phoenix_count > 0:
+                    pair_ranks.append(sorted_cards[i].rank)
+                    phoenix_count -= 1
+                    i += 1
+                else:
+                    return False
+
+        # Falls nach der Pärchenbildung noch Phoenix übrig sind, setze sie ans Ende
+        while phoenix_count > 0:
+            if pair_ranks:
+                pair_ranks.append(pair_ranks[-1] + 1)  # Nächsthöheres Paar
+            else:
+                pair_ranks.append(1)  # Falls nur Phoenix, starte bei klein
+            phoenix_count -= 1
+
+        # Prüfen, ob die Paare aufeinanderfolgen
+        return all(pair_ranks[i + 1] == pair_ranks[i] + 1 for i in range(len(pair_ranks) - 1))
 
     def get_rank(self):
         if self.type == "single":
@@ -118,6 +159,8 @@ class Combo:
             if self.phoenix_straight_max:
                 return 100 * len(self.cards) + max(c.rank for c in self.cards) + 1
             return 100 * len(self.cards) + max(c.rank for c in self.cards)
+        elif self.type == "pair_sequence":
+            return 200 * len(self.cards) + max(c.rank for c in self.cards)
         return -1  # Invalid combos
 
     def __repr__(self):
@@ -125,6 +168,8 @@ class Combo:
             out = f"{self.type} of {self.rank}s"
         elif self.type in ["straight", "bomb_straight"]:
             out = f"{str(self.rank)[0]}er {self.type} to {self.rank % 100}"
+        elif self.type == "pair_sequence":
+            out = f"{str(self.rank/2)[0]}er {self.type} to {self.rank % 200}"
         else:
             out = self.type
         return out

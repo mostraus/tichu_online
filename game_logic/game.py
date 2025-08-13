@@ -4,10 +4,11 @@ import random
 from game_logic.card import create_tichu_deck
 from game_logic.player import TichuPlayer
 from game_logic.combo import Combo
+from game_logic.Helpers import card_to_filename, flatten
 
 
 class TichuGame:
-    def __init__(self, players):
+    def __init__(self, players, socketio):
         assert len(players) == 4, "Tichu requires exactly 4 players."
         self.players = players
         self.assign_teams()
@@ -24,11 +25,35 @@ class TichuGame:
         self.dragon_possible_recipients = None
         self.team_scores = {"A": 0, "B": 0}
         self.pass_count = 0
+        self.socketio = socketio
 
     def assign_teams(self):
         # Assign teams A and B alternately
         for i, player in enumerate(self.players):
             player.team = 'A' if i % 2 == 0 else 'B'
+
+    def send_hands_to_players(self):
+        for p in self.players:
+            hand_images = [card_to_filename(card) for card in p.hand]
+            self.socketio.emit('update_hand', {'hand': hand_images}, room=p.sid)
+
+    def deal_first_eight(self):
+        # Deal 8 cards first (allow Grand Tichu declaration)
+        for _ in range(8):
+            for p in self.players:
+                p.receive_card(self.deck.pop())
+        # TODO: (Frontend will allow Grand Tichu calls here)
+        self.send_hands_to_players()
+        self.socketio.emit("call_grand_tichu")
+
+    def deal_remaining_cards(self):
+        # Deal remaining 6 cards
+        for _ in range(6):
+            for player in self.players:
+                player.receive_card(self.deck.pop())
+
+        for player in self.players:
+            print(player.hand)
 
     def start_new_round(self):
         # reset game
@@ -41,20 +66,7 @@ class TichuGame:
         for player in self.players:
             player.reset_for_new_round()
 
-        # Deal 8 cards first (allow Grand Tichu declaration)
-        for _ in range(8):
-            for player in self.players:
-                player.receive_card(self.deck.pop())
-
-        # (Frontend will allow Grand Tichu calls here)
-
-        # Deal remaining 6 cards
-        for _ in range(6):
-            for player in self.players:
-                player.receive_card(self.deck.pop())
-
-        for player in self.players:
-            print(player.hand)
+        self.deal_first_eight()
 
         self.set_starting_player_index()
 
@@ -64,9 +76,7 @@ class TichuGame:
     def set_starting_player_index(self):
         for i,p in enumerate(self.players):
             for c in p.hand:
-                print(c.rank)
                 if c.rank == 1:
-                    print("mah jong found")
                     self.turn_index = i
 
     def pass_cards(self, pass_dict):
@@ -119,7 +129,8 @@ class TichuGame:
 
     def valid_play(self, cards_to_play):
         combo = Combo(cards_to_play, self)
-        if combo.identify_combo_type() == "invalid":
+        combo_type = combo.identify_combo_type()
+        if combo_type == "invalid":
             print("This is not a valid Combo!")
             return False
         else:
@@ -129,7 +140,10 @@ class TichuGame:
                 return False
             elif self.current_trick:
                 current_combo = self.current_trick[-1]["combo"]
-                if combo.rank > current_combo.rank:
+                current_combo_type = current_combo.identify_combo_type()
+                if (current_combo_type in ["pair_sequence", "straight"]) and (len(current_combo.cards) != len(combo.cards)):
+                    return False
+                elif combo.rank > current_combo.rank:
                     return True
                 else:
                     return False
@@ -144,7 +158,7 @@ class TichuGame:
     def calculate_round_points(self):
         round_points = {"A": 0, "B": 0}
         for p in self.players:
-            points = sum([c.points for c in p.tricks_won])
+            points = sum([c.points for c in flatten(p.tricks_won)])
             # last players hand goes to first player and their points go to the opposing team
             if p not in self.finished_players:
                 round_points[self.finished_players[0].team] += sum([c.points for c in p.hand])

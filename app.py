@@ -5,6 +5,7 @@ from game_logic.game import TichuGame
 from game_logic.card import TichuCard
 from game_logic.combo import Combo
 import traceback
+from game_logic.Helpers import card_to_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tichu-secret'
@@ -45,11 +46,11 @@ def handle_join(data):
 
 def start_game():
     global game
-    game = TichuGame(players)
+    game = TichuGame(players, socketio)
     game.start_new_round()
 
     # Send initial hands to each player
-    send_hands_to_players()
+    game.send_hands_to_players()
 
     socketio.emit('game_message', {'message': "All cards have been dealt. Begin passing phase."})
 
@@ -76,20 +77,6 @@ def handle_disconnect():
         socketio.emit('game_message', {'message': f"{player.name} has left the game."})
 
 
-def send_hands_to_players():
-    global game
-    for player in game.players:
-        hand_images = [card_to_filename(card) for card in player.hand]
-        socketio.emit('update_hand', {'hand': hand_images}, room=player.sid)
-
-
-def card_to_filename(card: TichuCard):
-    if card.suit:
-        return f"{card.suit}_{card.name}.png"
-    else:
-        return f"{card.name}.png"
-
-
 @socketio.on('play_card')
 def handle_play_card(data):
     sid = request.sid
@@ -106,6 +93,10 @@ def handle_play_card(data):
         game.advance_turn()
         return
 
+    if not player.called_tichu and not player.has_played:
+        # TODO: Frontend Tichu call
+        pass
+
     game.pass_count = 0  # sobald jemand spielt, werden Pässe zurückgesetzt
 
     card_filenames = data.get('cards', [])
@@ -115,6 +106,9 @@ def handle_play_card(data):
         if not game.valid_play(cards):
             emit('error_message', {'message': 'Invalid play!'})
             return
+
+        player.has_played = True
+        game.wish = None
 
         if any(c.name.lower() == "mah jong" for c in cards):
             game.waiting_for_wish = True
@@ -148,7 +142,7 @@ def handle_play_card(data):
             rank = game.current_trick[-1]["combo"].rank
             socketio.emit('game_message', {'message': f"Phoenix was played as single with rank: {rank}"})
 
-        send_hands_to_players()  # Update everyone’s hand
+        game.send_hands_to_players()  # Update everyone’s hand
         game.advance_turn()
         current = game.get_current_player()
         for player in game.players:
@@ -200,7 +194,7 @@ def handle_pass():
     game.pass_count += 1
     socketio.emit('game_message', {'message': f"{player.name} has passed."})
 
-    if game.pass_count >= 4:
+    if game.pass_count >= (len(game.players) - len(game.finished_players)):
         # Trick endet, letzter Spieler gewinnt
         winning_combo = game.current_trick[-1]["combo"]
         winner = game.current_trick[-1]["player"]
@@ -217,8 +211,17 @@ def handle_pass():
         game.current_trick = []
         game.pass_count = 0
 
-        game.turn_index = game.players.index(winner)  # Winner spielt weiter
-        socketio.emit('turn_message', {'message': f"{winner.name} starts next trick."})
+        if winner not in game.finished_players:
+            game.turn_index = game.players.index(winner)  # Winner spielt weiter
+            socketio.emit('turn_message', {'message': f"{winner.name} starts next trick."})
+        else:
+            for _ in range(4):
+                next_player = game.players[(game.players.index(winner) + 1) % len(players)]
+                if next_player not in game.finished_players:
+                    game.turn_index = game.players.index(next_player)  # Winner spielt weiter
+                    socketio.emit('turn_message', {'message': f"{next_player.name} starts next trick."})
+                    break
+
     else:
         game.advance_turn()
         current = game.get_current_player()
@@ -283,8 +286,25 @@ def handle_ready():
     if len(ready_players) == len(game.players):
         ready_players.clear()
         game.start_new_round()
-        send_hands_to_players()
+        game.send_hands_to_players()
         socketio.emit("game_message", {"message": f"Runde {game.round_number} beginnt!"})
+
+
+@socketio.on("grand_tichu_choice")
+def handle_grand_tichu_choice(data):
+    sid = request.sid
+    player = sid_to_player[sid]
+    choice = data.get("choice")  # True oder False
+    player.called_grand_tichu = choice
+    if choice:
+        socketio.emit("game_message", {"message": f"{player.name} declares a GRAND Tichu!"})
+    else:
+        socketio.emit("game_message", {"message": f"{player.name} reaches for their cards."})
+
+    # Prüfen ob alle entschieden haben
+    if all(p.called_grand_tichu is not None for p in game.players):
+        game.deal_remaining_cards()
+        game.send_hands_to_players()
 
 
 if __name__ == '__main__':
