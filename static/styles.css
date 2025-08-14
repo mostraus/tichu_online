@@ -85,14 +85,21 @@ button {
   cursor: pointer;
 }
 
-#dragon-overlay {
+/* === Gemeinsamer Overlay-Grundstil === */
+.overlay-base {
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.6);
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+.hidden { display: none; }
+
+/* === Dragon Trick Pass Overlay === */
+.dragon-overlay {
+    background: rgba(0, 0, 0, 0.6);
     z-index: 9999;
 }
 
@@ -126,20 +133,58 @@ button {
     background: #45a049;
 }
 
-.overlay {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+/* === Grand Tichu Overlay === */
+.grand-tichu-overlay {
     background: rgba(0,0,0,0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
     z-index: 1000;
 }
-.overlay.hidden { display: none; }
-.overlay-content {
+
+.grand-tichu-overlay .overlay-content {
     background: white;
     padding: 20px;
     border-radius: 10px;
     text-align: center;
+}
+
+/* === Passing Cards Overlay === */
+.passing-overlay {
+    background: rgba(0, 0, 0, 0.8);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+}
+
+.passing-overlay .card-container {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.passing-overlay .card-container img {
+    width: 80px;
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+
+.passing-overlay .card-container img.selected {
+    border-color: yellow;
+}
+
+.passing-overlay .passing-targets {
+    display: flex;
+    gap: 20px;
+    margin: 15px 0;
+}
+
+.passing-overlay .target {
+    padding: 10px;
+    background: #333;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.passing-overlay .target.selected {
+    background: green;
 }

@@ -9,7 +9,7 @@ from game_logic.Helpers import card_to_filename
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tichu-secret'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', ping_interval=3600, ping_timeout=7200)
 
 players = []
 sid_to_player = {}
@@ -54,7 +54,7 @@ def start_game():
 
     socketio.emit('game_message', {'message': "All cards have been dealt. Begin passing phase."})
 
-    # TODO: initiate pass phase
+    socketio.emit("start_passing_cards", )
 
     current_player = game.get_current_player()
     for player in game.players:
@@ -92,10 +92,6 @@ def handle_play_card(data):
         emit('error_message', {'message': "You are finished already!"})
         game.advance_turn()
         return
-
-    if not player.called_tichu and not player.has_played:
-        # TODO: Frontend Tichu call
-        pass
 
     game.pass_count = 0  # sobald jemand spielt, werden Pässe zurückgesetzt
 
@@ -305,6 +301,67 @@ def handle_grand_tichu_choice(data):
     if all(p.called_grand_tichu is not None for p in game.players):
         game.deal_remaining_cards()
         game.send_hands_to_players()
+
+
+@socketio.on("tichu_call")
+def handle_tichu_call(data):
+    sid = request.sid
+    player = sid_to_player.get(sid)
+    if not player:
+        emit("error_message", {"message": "Player not found"})
+        return
+
+    player.called_tichu = True
+    socketio.emit("game_message", {"message": f"{player.name} has called Tichu!"})
+
+
+@socketio.on("pass_cards")
+def handle_pass_cards(data):
+    """
+    Nimmt die Zuordnung {cardId: targetPlayerId} entgegen
+    und führt den Kartenübergang aus.
+    """
+    assignments = data.get("assignments", {})
+
+    # Beispiel: assignments = { "spades_13": "p2", "hearts_5": "p3", "diamonds_7": "p4" }
+
+    from_player = sid_to_player[request.sid]
+    from_player.passed_cards = True
+
+    for target_id, card_id in assignments.items():
+        if "_" in card_id:
+            rank, suit = card_id.split("_")
+            rank = int(rank)
+            # Karte im Spieler-Objekt finden
+            card = next((c for c in from_player.hand if c.suit == suit and c.rank == rank), None)
+        else:
+            card = next((c for c in from_player.hand if c.name == card_id), None)
+        if card:
+            from_player.hand.remove(card)
+            target_player = get_player_by_name(target_id)
+            target_player.hand.append(card)
+            target_player.passing_info.append({"card": card, "player": from_player.name})
+            target_player.hand.sort()
+
+    # Optional: Prüfen, ob alle Spieler fertig sind → Passing-Phase beenden
+    if all(player.passed_cards for player in game.players):
+        socketio.emit("passing_complete")
+        # Jetzt geht's mit normalem Spielstart weiter
+        game.set_starting_player_index()
+        socketio.emit('turn_message', {'message': f"{game.players[game.turn_index]} starts next trick."})
+        # Beispiel: nach Abschluss des Passen-Vorgangs
+        game.send_hands_to_players()
+        # Game messages erstellen
+        for p in game.players:
+            for entry in p.passing_info:
+                message = f"You received {entry['card']} from {entry['player']}"
+                socketio.emit("game_message", {"message": message}, room=p.sid)
+
+
+def get_player_by_name(player_name):
+    for p in game.players:
+        if p.name == player_name:
+            return p
 
 
 if __name__ == '__main__':

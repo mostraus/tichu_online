@@ -6,6 +6,10 @@ class TichuCard:
         self.suit = suit  # "black", "green", "blue", "red", or None
         self.rank = rank  # 2-14 for standard, custom for specials
         self.points = points  # Used for scoring
+        if self.suit:
+            self.id = self.name + "_" + self.suit
+        else:
+            self.id = self.name
 
     def __repr__(self):
         return f"{self.name} of {self.suit}" if self.suit else self.name

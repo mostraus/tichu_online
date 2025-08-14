@@ -62,6 +62,7 @@ function submitSelectedCards() {
     if (selectedCards.length === 0) return alert("No cards selected!");
     socket.emit("play_card", { cards: selectedCards });
     selectedCards = [];
+    document.getElementById("tichu-btn").style.display = "none";
 }
 
 socket.on("last_played", data => {
@@ -160,15 +161,139 @@ socket.on("choose_grand_tichu", () => {
 });
 
 socket.on("call_grand_tichu", () => {
-    document.getElementById('grand-tichu-overlay').classList.remove('hidden');
+    showOverlay("grand-tichu-overlay");
 });
 
 document.getElementById("sendGrandTichuYes").addEventListener('click', () => {
     socket.emit("grand_tichu_choice", {'choice': true});
-    document.getElementById('grand-tichu-overlay').classList.add('hidden');
+    hideOverlay("grand-tichu-overlay");
 });
 
 document.getElementById("sendGrandTichuNo").addEventListener('click', () => {
     socket.emit("grand_tichu_choice", {'choice': false});
-    document.getElementById('grand-tichu-overlay').classList.add('hidden');
+    hideOverlay("grand-tichu-overlay");
 });
+
+function callTichu() {
+    socket.emit("tichu_call", { choice: true });
+}
+
+let selectedCard = null;
+let passAssignments = {}; // { targetName: cardId }
+
+socket.on("start_passing", (data) => {
+
+    passAssignments = {};
+    selectedCard = null;
+    document.getElementById("confirm-pass").disabled = true;
+
+    // Handkarten anzeigen
+    const handDiv = document.getElementById("passing-hand");
+    handDiv.innerHTML = "";
+    data.cards.forEach(card => {
+        const img = document.createElement("img");
+        img.classList.add("card")
+        img.src = card.image;
+        img.dataset.cardId = card.id;
+        img.addEventListener("click", () => {
+            document.querySelectorAll("#passing-hand img").forEach(c => c.classList.remove("selected"));
+            img.classList.add("selected");
+            selectedCard = card.id;
+        });
+        handDiv.appendChild(img);
+    });
+    updatePassSummary()
+    // Ziel-Buttons dynamisch erstellen
+    const targetsDiv = document.getElementById("passing-targets");
+    targetsDiv.innerHTML = "";
+    data.targets.forEach(targetName => {
+        const targetBtn = document.createElement("div");
+        targetBtn.classList.add("target");
+        targetBtn.dataset.target = targetName;
+        targetBtn.textContent = targetName;
+
+        targetBtn.addEventListener("click", () => {
+            if (!selectedCard) return alert("Select a card first!");
+
+            passAssignments[targetName] = selectedCard;
+
+            // Falls für diesen Spieler schon eine Karte zugewiesen ist → zurück in Hand
+            if (passAssignments[targetName]) {
+                const oldCard = passAssignments[targetName];
+                renderCardBackToHand(oldCard);
+            }
+
+            // Markiere Button als ausgewählt
+            targetBtn.classList.add("selected");
+
+            // Entferne Karte aus Anzeige
+            const img = document.querySelector(`#passing-hand img[data-card-id='${selectedCard}']`);
+            if (img) img.remove();
+
+            selectedCard = null;
+            updatePassSummary()
+            // Prüfen ob alle Ziele belegt sind
+            if (Object.keys(passAssignments).length === data.targets.length) {
+                document.getElementById("confirm-pass").disabled = true; // erst erlauben, wenn komplett
+                document.getElementById("confirm-pass").disabled = false;
+            }
+        });
+
+        targetsDiv.appendChild(targetBtn);
+    });
+
+    // Overlay anzeigen
+    document.getElementById("left-panel").classList.add("hidden");
+    showOverlay("passing-overlay");
+});
+
+// Bestätigung
+document.getElementById("confirm-pass").addEventListener("click", () => {
+    socket.emit("pass_cards", { assignments: passAssignments });
+    hideOverlay("passing-overlay");
+    document.getElementById("left-panel").classList.remove("hidden");
+
+});
+
+function renderCardBackToHand(card) {
+    const specialCards = ["dragon", "mah jong", "phoenix", "dog"];
+    const handDiv = document.getElementById("passing-hand");
+    let img = document.createElement("img");
+    if (specialCards.includes(card.toLowerCase())) {
+        img.src = `/static/cards/${card.toLowerCase()}.png`;
+    } else {
+        let [value, suit] = card.split("_");  // "8_spades" → ["8", "spades"]
+        img.src = `/static/cards/${suit}_${value}.png`;  // "spades_8.png"
+    }
+    img.classList.add("card")
+    img.dataset.card = card;
+    img.addEventListener("click", () => {
+        document.querySelectorAll("#passing-hand img").forEach(c => c.classList.remove("selected"));
+        img.classList.add("selected");
+        selectedCard = card;
+    });
+    handDiv.appendChild(img);
+}
+
+function showOverlay(id) {
+    document.getElementById(id).classList.remove("hidden");
+}
+
+function hideOverlay(id) {
+    document.getElementById(id).classList.add("hidden");
+}
+
+passAssignments[target] = selectedCard;
+updatePassSummary();
+
+function updatePassSummary() {
+    const summary = document.getElementById("pass-summary");
+    summary.innerHTML = "";
+    for (let player in passAssignments) {
+        if (passAssignments[player]) {
+            summary.innerHTML += `<p>${passAssignments[player]} → ${player}</p>`;
+        } else {
+            summary.innerHTML += `<p>– → ${player}</p>`;
+        }
+    }
+}

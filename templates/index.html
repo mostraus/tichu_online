@@ -24,6 +24,7 @@
         <div id="selected"></div>
         <button onclick="submitSelectedCards()">Play Selected Cards</button>
         <button onclick="passTurn()">Pass</button>
+        <button id="tichu-btn" onclick="callTichu()">Call Tichu</button>
 
         <h3>Last Played Cards</h3>
         <div id="last-played" class="card-row"></div>
@@ -57,6 +58,21 @@
   <h2>Do you want to declare a grand Tichu?</h2>
   <button id="sendGrandTichuYes">Yes</button>
   <button id="sendGrandTichuNo">No</button>
+</div>
+
+<!-- Passing Cards Overlay -->
+<div id="passing-overlay" class="overlay hidden">
+    <div class="overlay-content">
+        <h2>Choose a card for each player</h2>
+
+        <div id="passing-hand" class="card-container"></div>
+
+        <div id="passing-targets" class="passing-targets"></div>
+
+        <div id="pass-summary"></div>
+
+        <button id="confirm-pass" disabled>Confirm Pass</button>
+    </div>
 </div>
 
 <script src="{{ url_for('static', filename='script.js') }}"> </script>

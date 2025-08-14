@@ -42,7 +42,7 @@ class TichuGame:
         for _ in range(8):
             for p in self.players:
                 p.receive_card(self.deck.pop())
-        # TODO: (Frontend will allow Grand Tichu calls here)
+
         self.send_hands_to_players()
         self.socketio.emit("call_grand_tichu")
 
@@ -54,6 +54,18 @@ class TichuGame:
 
         for player in self.players:
             print(player.hand)
+
+        self.start_passing_phase()
+
+    def start_passing_phase(self):
+        for player in self.players:
+            cards_data = [{"id": card.id, "image": "static/cards/" + card_to_filename(card)} for card in player.hand]
+            targets = [p.name for p in self.players if p != player]
+            self.socketio.emit(
+                "start_passing",
+                {"cards": cards_data, "targets": targets},
+                room=player.sid  # nur an diesen Spieler
+            )
 
     def start_new_round(self):
         # reset game
@@ -68,46 +80,11 @@ class TichuGame:
 
         self.deal_first_eight()
 
-        self.set_starting_player_index()
-
-        # # TODO: (Frontend will allow passing here)
-        # You can call self.pass_cards() if logic is implemented
-
     def set_starting_player_index(self):
         for i,p in enumerate(self.players):
             for c in p.hand:
                 if c.rank == 1:
                     self.turn_index = i
-
-    def pass_cards(self, pass_dict):
-        """
-        Expects dict like:
-        {
-            "Alice": [card1, card2, card3],
-            "Bob": [cardA, cardB, cardC],
-            ...
-        }
-        Each player passes 3 cards in order:
-        - left (to player on their left)
-        - across
-        - right
-        """
-        # Index map for left, across, right
-        num_players = len(self.players)
-        left = lambda i: (i + 1) % num_players
-        across = lambda i: (i + 2) % num_players
-        right = lambda i: (i + 3) % num_players
-
-        # Resolve passing
-        for i, player in enumerate(self.players):
-            cards = pass_dict[player.name]
-            if len(cards) != 3:
-                raise ValueError(f"{player.name} must pass exactly 3 cards.")
-            player.remove_cards(cards)
-
-            self.players[left(i)].receive_card(cards[0])
-            self.players[across(i)].receive_card(cards[1])
-            self.players[right(i)].receive_card(cards[2])
 
     def get_current_player(self):
         return self.players[self.turn_index]
@@ -141,12 +118,22 @@ class TichuGame:
             elif self.current_trick:
                 current_combo = self.current_trick[-1]["combo"]
                 current_combo_type = current_combo.identify_combo_type()
-                if (current_combo_type in ["pair_sequence", "straight"]) and (len(current_combo.cards) != len(combo.cards)):
-                    return False
-                elif combo.rank > current_combo.rank:
+                if current_combo_type == combo_type:
+                    if (current_combo_type in ["pair_sequence", "straight"]) and (len(current_combo.cards) != len(combo.cards)):
+                        return False
+                    elif combo.rank > current_combo.rank:
+                        return True
+                    else:
+                        return False
+                # 4er bomb wins except vs straight bomb, 4er vs 4er is handled above
+                if combo_type == "bomb_4kind":
+                    if "bomb" not in current_combo_type:
+                        return True
+                    else:
+                        return False
+                # straight bomb wins bc straight bomb vs straight bomb is handled above
+                if combo_type == "bomb_straight":
                     return True
-                else:
-                    return False
             else:
                 return True
 
@@ -158,23 +145,51 @@ class TichuGame:
     def calculate_round_points(self):
         round_points = {"A": 0, "B": 0}
         for p in self.players:
-            points = sum([c.points for c in flatten(p.tricks_won)])
-            # last players hand goes to first player and their points go to the opposing team
-            if p not in self.finished_players:
-                round_points[self.finished_players[0].team] += sum([c.points for c in p.hand])
-                if p.team == "A":
-                    round_points["B"] += points
-                else:
-                    round_points["A"] += points
+            # double win
+            if self.finished_players[0].team == self.finished_players[1].team:
+                if p.team == self.finished_players[0].team:
+                    round_points[p.team] += 100
+            # points for cards won
             else:
-                round_points[p.team] += points
+                points = sum([c.points for c in [trick for trick in p.tricks_won]])
+                # last players hand goes to opposing team and their points go to the first player
+                if p not in self.finished_players:
+                    round_points[self.finished_players[0].team] += points
+                    if p.team == "A":
+                        round_points["B"] += sum([c.points for c in p.hand])
+                    else:
+                        round_points["A"] += sum([c.points for c in p.hand])
+                else:
+                    round_points[p.team] += points
+            # points for tichu call
+            if p.called_tichu:
+                if p == self.finished_players[0]:
+                    round_points[p.team] += 100
+                else:
+                    round_points[p.team] -= 100
+            # points for grand tichu call
+            if p.called_grand_tichu:
+                if p == self.finished_players[0]:
+                    round_points[p.team] += 200
+                else:
+                    round_points[p.team] -= 200
         self.team_scores["A"] += round_points["A"]
         self.team_scores["B"] += round_points["B"]
         return round_points
 
 
 if __name__ == "__main__":
-    game = TichuGame(["Alice", "Bob", "Clara", "David"])
-    game.start_new_round()
+    game = TichuGame([TichuPlayer(name) for name in ["Alice", "Bob", "Clara", "David"]], None)
+    #game.start_new_round()
+    game.deck = create_tichu_deck()
+    random.shuffle(game.deck)
+    game.finished_players += game.players[1:]
+
     for player in game.players:
-        print(f"{player.name} ({player.team}): {len(player.hand)} cards")
+        for _ in range(10):
+            player.hand.append(game.deck.pop())
+        player.add_trick(c for c in player.hand)
+        print(player.name, player.team)
+        print(player.tricks_won)
+    round_points = game.calculate_round_points()
+    print(round_points)

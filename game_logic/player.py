@@ -11,6 +11,8 @@ class TichuPlayer:
         self.finished = False  # True if player is out of cards
         self.sid = sid
         self.has_played = False
+        self.passed_cards = False
+        self.passing_info = []    # list of dicts with [{"card": card, "player": player.name}]
 
     def receive_card(self, card):
         self.hand.append(card)
@@ -25,11 +27,6 @@ class TichuPlayer:
 
     def has_card(self, card):
         return card in self.hand
-
-    def get_passable_cards(self):
-        """Called at the start of a round to pass 3 cards."""
-        # You can replace this with interactive or frontend logic
-        return self.hand[:3]  # Default: pass first 3 (for now)
 
     def add_trick(self, cards):
         self.tricks_won.extend(cards)
@@ -47,6 +44,7 @@ class TichuPlayer:
 
     def __repr__(self):
         return f"{self.name} (Team {self.team})"
+
 
 if __name__ == "__main__":
     from card import create_tichu_deck
