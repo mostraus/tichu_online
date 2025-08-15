@@ -1,4 +1,6 @@
-const socket = io();
+const socket = io(window.location.origin, {
+    transports: ['websocket'], // zwingt WebSocket
+});
 const joinDiv = document.getElementById("join");
 const gameDiv = document.getElementById("game");
 const messages = document.getElementById("messages");

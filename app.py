@@ -6,6 +6,7 @@ from game_logic.card import TichuCard
 from game_logic.combo import Combo
 import traceback
 from game_logic.Helpers import card_to_filename
+import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tichu-secret'
@@ -372,5 +373,12 @@ def get_player_by_name(player_name):
             return p
 
 
-if __name__ == '__main__':
-    socketio.run(app, host='localhost', port=5000)
+#if __name__ == '__main__':
+#    socketio.run(app, host='localhost', port=5000)
+
+#if __name__ == "__main__":
+#    socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
+
+if __name__ == "__main__":
+    import eventlet
+    eventlet.wsgi.server(eventlet.listen(('', int(os.environ.get("PORT", 5000)))), app)
