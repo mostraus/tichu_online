@@ -8,12 +8,6 @@
 </head>
 <body>
 
-<div id="join">
-    <h2>Join Tichu Game</h2>
-    <input type="text" id="nameInput" placeholder="Enter your name">
-    <button onclick="joinGame()">Join</button>
-</div>
-
 <div id="game">
     <div id="left-panel">
         <h2>Your Hand</h2>
@@ -73,6 +67,20 @@
 
         <button id="confirm-pass" disabled>Confirm Pass</button>
     </div>
+</div>
+
+<!-- Login Overlay -->
+<div id="login-overlay" class="overlay">
+  <div class="overlay-content">
+    <h2>Join the Game</h2>
+    <input id="player-name" type="text" placeholder="Your name" />
+    <select id="team-select">
+      <option value="" disabled selected>Choose team</option>
+      <option value="A">Team A</option>
+      <option value="B">Team B</option>
+    </select>
+    <button id="join-game-btn">Join Game</button>
+  </div>
 </div>
 
 <script src="{{ url_for('static', filename='script.js') }}"> </script>

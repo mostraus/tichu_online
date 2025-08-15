@@ -1,7 +1,7 @@
 # game_logic/tichu_game.py
 
 import random
-from game_logic.card import create_tichu_deck
+from game_logic.card import create_tichu_deck, TichuCard
 from game_logic.player import TichuPlayer
 from game_logic.combo import Combo
 from game_logic.Helpers import card_to_filename, flatten
@@ -151,7 +151,15 @@ class TichuGame:
                     round_points[p.team] += 100
             # points for cards won
             else:
-                points = sum([c.points for c in [trick for trick in p.tricks_won]])
+                points = 0
+                for trick in p.tricks_won:
+                    if isinstance(trick, TichuCard):
+                        trick = [trick]  # in Liste packen
+                    print(trick)
+                    for c in trick:
+                        print(c)
+                        points += c.points
+                #points = sum([c.points for c in [trick for trick in p.tricks_won]])
                 # last players hand goes to opposing team and their points go to the first player
                 if p not in self.finished_players:
                     round_points[self.finished_players[0].team] += points

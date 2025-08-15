@@ -24,21 +24,23 @@ def index():
 
 @socketio.on('join')
 def handle_join(data):
+    print("JOIN RECEIVED:", data)
     global game
     name = data['name']
+    team = data["team"]
     sid = request.sid
     print(f"{name} joined with SID: {sid}")
 
     if sid in sid_to_player:
         return
 
-    player = TichuPlayer(name, sid)
+    player = TichuPlayer(name, team=team, sid=sid)
     players.append(player)
     sid_to_player[sid] = player
     print(sid_to_player)
     sid_order.append(sid)
 
-    socketio.emit('game_message', {'message': f"{name} has joined."})
+    socketio.emit('game_message', {'message': f"{name} has joined Team {team}."})
 
     if len(players) == 4:
         start_game()
@@ -196,7 +198,7 @@ def handle_pass():
         winner = game.current_trick[-1]["player"]
         socketio.emit('game_message', {'message': f"{winner.name} wins the trick with {winning_combo}."})
 
-        if winning_combo.contains_dragon:
+        if winning_combo.contains_dragon and len(game.finished_players) < 3:
             game.dragon_possible_recipients = [p.name for p in game.players if p.team != winner.team]
             game.waiting_for_dragon_choice = True
             game.dragon_winner = winner
@@ -330,8 +332,14 @@ def handle_pass_cards(data):
 
     for target_id, card_id in assignments.items():
         if "_" in card_id:
-            rank, suit = card_id.split("_")
-            rank = int(rank)
+            rank_str, suit = card_id.split("_")
+            rank_map = {"J": 11,"Q": 12,"K": 13,"A": 14}
+            try:
+                rank = int(rank_str)  # für 2–10
+            except ValueError:
+                rank = rank_map.get(rank_str, None)  # für J, Q, K,
+            if rank is None:
+                raise ValueError(f"Unbekannter Kartenwert: {rank_str}")
             # Karte im Spieler-Objekt finden
             card = next((c for c in from_player.hand if c.suit == suit and c.rank == rank), None)
         else:

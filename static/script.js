@@ -3,14 +3,22 @@ const joinDiv = document.getElementById("join");
 const gameDiv = document.getElementById("game");
 const messages = document.getElementById("messages");
 
-function joinGame() {
-    const name = document.getElementById("nameInput").value.trim();
-    if (name === "") return alert("Enter a name first.");
-    socket.emit("join", { name });
-    joinDiv.style.display = "none";
-    gameDiv.style.display = "block";
-    logMessage("✅ Joined game as " + name);
-}
+document.getElementById("join-game-btn").addEventListener("click", () => {
+    console.log("Join button clicked!");
+    const name = document.getElementById("player-name").value.trim();
+    const team = document.getElementById("team-select").value;
+
+    if (!name || !team) {
+        alert("Please enter your name and choose a team.");
+        return;
+    }
+
+    socket.emit("join", { name, team });
+
+    // Overlay ausblenden
+    document.getElementById("login-overlay").classList.add("hidden");
+    document.getElementById("game").style.display = "flex";
+});
 
 function submitMove() {
     const move = document.getElementById("moveInput").value.trim();
@@ -297,3 +305,4 @@ function updatePassSummary() {
         }
     }
 }
+

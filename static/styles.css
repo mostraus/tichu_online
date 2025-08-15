@@ -1,12 +1,13 @@
 /* Gesamt-Layout */
 #game {
-  display: flex;
+  display: none;
   flex-direction: row;
   align-items: flex-start;
   gap: 20px;
   flex-wrap: wrap;
   margin-top: 20px;
 }
+.hidden { display: none; }
 
 /* Linker Bereich mit Hand, Eingabe usw. */
 #left-panel {
@@ -187,4 +188,38 @@ button {
 
 .passing-overlay .target.selected {
     background: green;
+}
+
+/* Login overlay extra styling */
+#login-overlay {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+#login-overlay .overlay-content {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  text-align: center;
+  width: 300px;
+}
+
+#login-overlay input,
+#login-overlay select {
+  width: 100%;
+  padding: 8px;
+  margin: 10px 0;
+}
+
+#login-overlay button {
+  width: 100%;
+  padding: 10px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#login-overlay button:hover {
+  background: #45a049;
 }
